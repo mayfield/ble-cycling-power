@@ -19,12 +19,12 @@ var CyclingPowerMeasurementCharacteristic = function() {
       new Descriptor({
         // Client Characteristic Configuration
         uuid: '2902',
-        value: new Buffer([0])
+        value: new Buffer([0, 0])
       }),
       new Descriptor({
         // Server Characteristic Configuration
         uuid: '2903',
-        value: new Buffer([0])
+        value: new Buffer([0, 0])
       })
     ]
   });
