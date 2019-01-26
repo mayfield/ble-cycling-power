@@ -8,8 +8,7 @@ var Descriptor = bleno.Descriptor;
 var Characteristic = bleno.Characteristic;
 
 // Profile:
-// https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.sensor_location.xml
-// 13 = rear hub
+// https://www.bluetooth.com/specifications/gatt/viewer?attributeXmlFile=org.bluetooth.characteristic.cycling_power_feature.xml
 
 var CyclingPowerFeatureCharacteristic = function() {
   CyclingPowerFeatureCharacteristic.super_.call(this, {

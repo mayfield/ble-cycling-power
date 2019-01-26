@@ -1,12 +1,9 @@
-var util = require('util');
-var os = require('os');
-var exec = require('child_process').exec;
-var debug = require('debug')('pm');
+const util = require('util');
+const debug = require('debug')('pm');
+const bleno = require('bleno');
 
-var bleno = require('bleno');
-
-var Descriptor = bleno.Descriptor;
-var Characteristic = bleno.Characteristic;
+const Descriptor = bleno.Descriptor;
+const Characteristic = bleno.Characteristic;
 
 // Spec
 //https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.cycling_power_measurement.xml
@@ -19,12 +16,12 @@ var CyclingPowerMeasurementCharacteristic = function() {
       new Descriptor({
         // Client Characteristic Configuration
         uuid: '2902',
-        value: new Buffer([0, 0])
+        value: new Buffer([1, 0])  // notifications enabled
       }),
       new Descriptor({
         // Server Characteristic Configuration
         uuid: '2903',
-        value: new Buffer([0, 0])
+        value: new Buffer([0, 0])  // broadcasts disabled
       })
     ]
   });
@@ -37,6 +34,12 @@ util.inherits(CyclingPowerMeasurementCharacteristic, Characteristic);
 CyclingPowerMeasurementCharacteristic.prototype.onSubscribe = function(maxValueSize, updateValueCallback) {
   console.log('[BLE] client subscribed to PM');
   this._updateValueCallback = updateValueCallback;
+  if (this.lastBuffer) {
+    console.warn("Sending last good buffer to newly subscribed client");
+    const buffer = this.lastBuffer;
+    this.lastBuffer = null;
+    updateValueCallback(buffer);
+  }
 };
 
 CyclingPowerMeasurementCharacteristic.prototype.onUnsubscribe = function() {
@@ -45,11 +48,7 @@ CyclingPowerMeasurementCharacteristic.prototype.onUnsubscribe = function() {
 };
 
 CyclingPowerMeasurementCharacteristic.prototype.notify = function(event) {
-  if (!('watts' in event) && !('rev_count' in event)) {
-    // ignore events with no power and no crank data
-    return;
-  }
-  var buffer = new Buffer(8);
+  const buffer = new Buffer(8);
   // flags
   // 00000001 - 1   - 0x001 - Pedal Power Balance Present
   // 00000010 - 2   - 0x002 - Pedal Power Balance Reference
@@ -60,26 +59,35 @@ CyclingPowerMeasurementCharacteristic.prototype.notify = function(event) {
   // 01000000 - 64  - 0x040 - Extreme Force Magnitudes Present
   // 10000000 - 128 - 0x080 - Extreme Torque Magnitudes Present
   buffer.writeUInt16LE(0x020, 0);
-
   if ('watts' in event) {
-    var watts = event.watts;
-    debug("power: " + watts);
-    buffer.writeInt16LE(watts, 2);
+    const watts = event.watts;
+    buffer.writeInt16LE(Math.round(watts), 2);
   }
 
-  if ('rev_count' in event) {
-    debug("rev_count: " + event.rev_count);
-    buffer.writeUInt16LE(event.rev_count, 4);
-
-    var now = Date.now();
-    var now_1024 = Math.floor(now*1e3/1024);
-    var event_time = now_1024 % 65536; // rolls over every 64 seconds
-    debug("event time: " + event_time);
-    buffer.writeUInt16LE(event_time, 6);
+  let revCount;
+  let revTime;
+  if ('cadence' in event) {
+    const rps = event.cadence / 60;
+    if (!this._lastRevCount) {
+        revCount = 1;
+        revTime = 1 / rps;
+    } else {
+        revCount = this._lastRevCount + 1;
+        revTime = this._lastRevTime + (1 / rps);
+    }
+    this._lastRevCount = revCount;
+    this._lastRevTime = revTime;
   }
-
+  if (revCount !== undefined) {
+    buffer.writeUInt16LE(revCount, 4);
+    const btTime = Math.round(revTime * 1024) & 0xffff;
+    buffer.writeUInt16LE(btTime, 6);
+  }
   if (this._updateValueCallback) {
+    this.lastBuffer = null;
     this._updateValueCallback(buffer);
+  } else {
+    this.lastBuffer = buffer;
   }
 }
 

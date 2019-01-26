@@ -1,11 +1,12 @@
-var util = require('util');
-var bleno = require('bleno');
+const util = require('util');
+const bleno = require('bleno');
 
-var BlenoPrimaryService = bleno.PrimaryService;
+const BlenoPrimaryService = bleno.PrimaryService;
 
-var CyclingPowerMeasurementCharacteristic = require('./cycling-power-measurement-characteristic');
-var CylingPowerFeatureCharacteristic = require('./cycling-power-feature-characteristic')
-var CyclingSensorLocationCharacteristic = require('./cycling-sensor-location-characteristic')
+const CyclingPowerMeasurementCharacteristic = require('./cycling-power-measurement-characteristic');
+const CylingPowerFeatureCharacteristic = require('./cycling-power-feature-characteristic')
+const CyclingSensorLocationCharacteristic = require('./cycling-sensor-location-characteristic')
+
 
 // https://developer.bluetooth.org/gatt/services/Pages/ServiceViewer.aspx?u=org.bluetooth.service.cycling_power.xml
 function CyclingPowerService() {

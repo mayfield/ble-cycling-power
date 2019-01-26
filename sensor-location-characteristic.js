@@ -1,10 +1,8 @@
-var util = require('util');
-var os = require('os');
-var exec = require('child_process').exec;
-var bleno = require('bleno');
+const util = require('util');
+const bleno = require('bleno');
 
-var Descriptor = bleno.Descriptor;
-var Characteristic = bleno.Characteristic;
+const Descriptor = bleno.Descriptor;
+const Characteristic = bleno.Characteristic;
 
 // Profile:
 // https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.body_sensor_location.xml

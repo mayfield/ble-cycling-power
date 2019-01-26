@@ -1,58 +1,43 @@
-var BluetoothPeripheral = function(name) {
-  var bleno = require('bleno');
-  var CyclingPowerService = require('./cycling-power-service');
-  var debug = require('debug')('ble');
-  process.env['BLENO_DEVICE_NAME'] = name;
-  this.primaryService = new CyclingPowerService();
-  this.last_timestamp = 0;
-  this.rev_count = 0;
-  var self = this;
+const CyclingPowerService = require('./cycling-power-service');
+const bleno = require('bleno');
+const debug = require('debug')('ble');
 
-  bleno.on('stateChange', function(state) {
+
+const BluetoothPeripheral = function(name) {
+  process.env['BLENO_DEVICE_NAME'] = name;
+  this.service = new CyclingPowerService();
+  this.rev_count = 0;
+
+  this.start = function() {
+    bleno.startAdvertising(process.env['BLENO_DEVICE_NAME'],
+                           [this.service.uuid]);
+  };
+  this.stop = function() {
+    bleno.stopAdvertising();
+  };
+
+  bleno.on('stateChange', state => {
     console.log('BLE state change: ' + state);
 
     if (state === 'poweredOn') {
-      bleno.startAdvertising(process.env['BLENO_DEVICE_NAME'],
-        [self.primaryService.uuid]);
+      this.start();
     } else {
-      bleno.stopAdvertising();
+      this.stop();
     }
   });
 
-  bleno.on('advertisingStart', function(error) {
+  bleno.on('advertisingStart', error => {
     debug('advertisingStart: ' + (error ? 'error ' + error : 'success'));
+    console.error("START START!!!!!");
 
     if (!error) {
-      bleno.setServices([self.primaryService], function(error){
+      bleno.setServices([this.service], function(error){
         debug('setServices: '  + (error ? 'error ' + error : 'success'));
       });
+    } else {
+      console.error("Doh!", error);
     }
   });
-
-  this.notify = function(event) {
-    debug("[BLE] " + JSON.stringify(event));
-    self.primaryService.notify(event);
-    if (!('watts' in event) && !('heart_rate' in event)) {
-      debug("unrecognized event: %j", event);
-    } else {
-      if ('rev_count' in event) {
-        self.rev_count = event.rev_count;
-      }
-      self.last_timestamp = Date.now();
-    }
-  };
-
-  var ping = function() {
-    var TIMEOUT = 4000;
-    // send a zero event if we don't hear for 4 seconds (15 rpm)
-    if (Date.now() - self.last_timestamp > TIMEOUT) {
-      self.notify({'heart_rate': 0,
-                   'watts': 0,
-                   'rev_count': self.rev_count})
-    }
-    setTimeout(ping, TIMEOUT);
-  }
-  ping();
 };
 
 module.exports.BluetoothPeripheral = BluetoothPeripheral;
