@@ -51,7 +51,7 @@ async function main() {
     }
     powerMeter.on('unsubscribe', () => {
         _unsubTime = Date.now();
-        _resetTimer = setTimeout(resetPowerMeter, 5000);
+        _resetTimer = setTimeout(resetPowerMeter, 4500);
     });
     powerMeter.on('subscribe', () => {
         clearTimeout(_resetTimer);
@@ -83,7 +83,7 @@ async function main() {
         iterations++;
         let watts = wattsBasis;
         if (signwave) {
-            watts += wattsBasis * 0.2 * Math.sin(iterations / 20);
+            watts += wattsBasis * 0.2 * Math.sin(Date.now() / 1000 / 15);
         }
         watts += jitter * (Math.random() - 0.5) * watts;
         watts = Math.max(0, Math.round(watts));
@@ -107,13 +107,13 @@ async function main() {
         } else {
             rev_count += 1;
         }
-        for (let i = 0; i < 2; i++) {
+        for (let i = 0; i < 3; i++) {
             peripheral.service.notify({
                 watts,
                 cadence,
                 hr
             });
-            await sleep(450);
+            await sleep(250);
         }
         const delay = 1000 - (Date.now() - start);
         await sleep(Math.round(delay));
