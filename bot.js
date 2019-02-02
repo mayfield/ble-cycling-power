@@ -1,7 +1,6 @@
 const bcp = require('./');
 const bleno = require('bleno');
 const os = require('os');
-const tty = require('tty');
 
 
 let wattsBasis = parseInt(process.argv[2]);
@@ -28,37 +27,47 @@ function rolling(windowSize) {
 }
 
 
+function warn() {
+    const now = new Date();
+    const args = [`\n${now.toLocaleTimeString()}.${now.getMilliseconds()}:`].concat(Array.from(arguments));
+    args.push('\n');
+    console.warn.apply(console, args);
+}
+
+
 async function main() {
     let iterations = 0;
     let total = 0;
-    let rev_count = 1;
     const powerMeter = peripheral.service.pm;
     global.powerMeter = powerMeter;
     bleno.on('accept', clientAddress => {
-        console.warn('accept', clientAddress);
+        warn('Connected client:', clientAddress);
     });
     bleno.on('disconnect', clientAddress => {
-        console.warn('disconnect', clientAddress);
+        warn('Disconnected client:', clientAddress);
     });
 
     /* At least with zwift things go side ways sometimes and we must reset..
      * Until we know why, we have to reset it unless it resolves itself. */
-    let _unsubTime;
-    let _resetTimer;
+    let unsubTime;
+    let resetTimer;
     function resetPowerMeter() {
-        console.error("Unrecoverable error, must manually restart till we figure this out.");
+        console.error(`\nUnrecoverable error! ${new Date()}\n`);
         process.exit(1);
     }
     powerMeter.on('unsubscribe', () => {
-        _unsubTime = Date.now();
-        _resetTimer = setTimeout(resetPowerMeter, 4500);
+        warn('Unsubscribed!');
+        unsubTime = Date.now();
+        resetTimer = setTimeout(resetPowerMeter, 4500);
     });
     powerMeter.on('subscribe', () => {
-        clearTimeout(_resetTimer);
+        warn('Subscribed');
+        unsubTime = null;
+        clearTimeout(resetTimer);
     });
 
     const hrRolling = rolling(20);
-    const cadenceRolling = rolling(10);
+    const cadenceRolling = rolling(8);
     let bigGear = false;
 
     const stdin = process.openStdin(); 
@@ -78,6 +87,7 @@ async function main() {
         }
     });
 
+    let lastWatts;
     while (true) {
         const start = Date.now();
         iterations++;
@@ -87,9 +97,7 @@ async function main() {
         }
         watts += jitter * (Math.random() - 0.5) * watts;
         watts = Math.max(0, Math.round(watts));
-        total += watts;
         const hr = hrRolling(90 + (80 * (watts / 400)) + (Math.random() * 20));
-        const gearRatio = Math.random()
         let cadence = cadenceRolling(50 + (40 * (watts / 400)) + (Math.random() * 10));
         if (bigGear) {
             cadence *= 0.75;
@@ -100,23 +108,27 @@ async function main() {
         if (Math.random() < 0.05) {
             bigGear = !bigGear;
         }
-        console.info(`[${name}]: current: ${watts}w, avg:${Math.round(total / iterations)}w, basis:${wattsBasis}, ` +
-                     `hr:${Math.round(hr)}, cadence:${Math.round(cadence)}${bigGear ? ' [Big Gear]' : ''}`);
-        if (Math.random() < 0.2) {
-            rev_count += 2;
-        } else {
-            rev_count += 1;
+        if (unsubTime && (Date.now() - unsubTime) > 998) {
+            warn('Last reading was dropped!');
+            total -= lastWatts;
         }
+        lastWatts = watts;
+        total += watts;
+        console.info(`[${name}]: iter:${iterations}, cur:${watts}w, avg:${Math.round(total / iterations)}w, ` +
+                     `basis:${wattsBasis}, hr:${Math.round(hr)}, cadence:${Math.round(cadence)}` +
+                     `${bigGear ? ' [Big Gear]' : ''}`);
         for (let i = 0; i < 3; i++) {
             peripheral.service.notify({
                 watts,
                 cadence,
                 hr
             });
-            await sleep(250);
+            await sleep(249);
         }
+
         const delay = 1000 - (Date.now() - start);
         await sleep(Math.round(delay));
     }
-};
-main();
+}
+
+main().catch(() => process.exit(1));
