@@ -3,8 +3,8 @@ const bleno = require('bleno');
 const os = require('os');
 
 
-let wattsBasis = parseInt(process.argv[2]);
-const jitter = Number(process.argv[3]);
+let wattsBasis = parseInt(process.argv[2] || 100);
+const jitter = Number(process.argv[3] || 0.2);
 const signwave = !!process.argv[4];
 const name = os.hostname();
 const peripheral = new bcp.BluetoothPeripheral(name);
