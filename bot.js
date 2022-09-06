@@ -4,6 +4,7 @@ const os = require('os');
 
 
 let wattsBasis = parseInt(process.argv[2] || 100);
+let cadenceBasis = 60;
 const jitter = Number(process.argv[3] || 0.2);
 const signwave = !!process.argv[4];
 const name = os.hostname();
@@ -80,10 +81,16 @@ async function main() {
             return;
         } else if (key === "\u001b[A") {
             wattsBasis = Math.min(1200, wattsBasis + 10);
-            console.log("Increase Watts Basis:", wattsBasis);
+            console.log("Increase watts basis:", wattsBasis);
         } else if (key === "\u001b[B") {
             wattsBasis = Math.max(0, wattsBasis - 10);
-            console.log("Decrease Watts Basis:", wattsBasis);
+            console.log("Decrease watts basis:", wattsBasis);
+        } else if (key === "c") {
+            cadenceBasis = Math.min(300, cadenceBasis + 5);
+            console.log("Increase cadence basis:", cadenceBasis);
+        } else if (key === "C") {
+            cadenceBasis = Math.max(0, cadenceBasis - 5);
+            console.log("Decrease cadence basis:", cadenceBasis);
         }
     });
 
@@ -98,7 +105,7 @@ async function main() {
         watts += jitter * (Math.random() - 0.5) * watts;
         watts = Math.max(0, Math.round(watts));
         const hr = hrRolling(90 + (80 * (watts / 400)) + (Math.random() * 20));
-        let cadence = cadenceRolling(50 + (40 * (watts / 400)) + (Math.random() * 10));
+        let cadence = cadenceRolling(cadenceBasis + (40 * (watts / 400)) + (Math.random() * 10));
         if (bigGear) {
             cadence *= 0.75;
         }
