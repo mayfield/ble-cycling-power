@@ -39,7 +39,7 @@ function warn() {
 async function main() {
     let iterations = 0;
     let total = 0;
-    const powerMeter = peripheral.service.pm;
+    const powerMeter = peripheral.powerService.pm;
     global.powerMeter = powerMeter;
     bleno.on('accept', clientAddress => {
         warn('Connected client:', clientAddress);
@@ -71,7 +71,7 @@ async function main() {
     const cadenceRolling = rolling(8);
     let bigGear = false;
 
-    const stdin = process.openStdin(); 
+    const stdin = process.openStdin();
     stdin.setRawMode(true);
     stdin.setEncoding('ascii');
     stdin.on('data', key => {
@@ -86,7 +86,7 @@ async function main() {
             wattsBasis = Math.max(0, wattsBasis - 10);
             console.log("Decrease watts basis:", wattsBasis);
         } else if (key === "c") {
-            cadenceBasis = Math.min(300, cadenceBasis + 5);
+            cadenceBasis = Math.min(200, cadenceBasis + 5);
             console.log("Increase cadence basis:", cadenceBasis);
         } else if (key === "C") {
             cadenceBasis = Math.max(0, cadenceBasis - 5);
@@ -125,11 +125,8 @@ async function main() {
                      `basis:${wattsBasis}, hr:${Math.round(hr)}, cadence:${Math.round(cadence)}` +
                      `${bigGear ? ' [Big Gear]' : ''}`);
         for (let i = 0; i < 3; i++) {
-            peripheral.service.notify({
-                watts,
-                cadence,
-                hr
-            });
+            peripheral.powerService.notify({watts,cadence});
+            peripheral.hrService.notify({hr});
             await sleep(249);
         }
 
