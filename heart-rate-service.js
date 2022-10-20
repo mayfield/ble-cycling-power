@@ -8,7 +8,6 @@ const HeartRateMeasurementCharacteristic = require('./heart-rate-measurement-cha
 
 function HeartRateService() {
   this.hrm = new HeartRateMeasurementCharacteristic();
-  var self = this;
   HeartRateService.super_.call(this, {
       uuid: '180D',
       characteristics: [this.hrm]

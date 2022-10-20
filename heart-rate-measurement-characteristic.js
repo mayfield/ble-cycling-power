@@ -13,12 +13,12 @@ var HeartRateMeasurementCharacteristic = function() {
       new Descriptor({
         // Client Characteristic Configuration
         uuid: '2902',
-        value: new Buffer([1, 0])  // notifications enabled
+        value: Buffer.from([1, 0])  // notifications enabled
       }),
       new Descriptor({
         // Server Characteristic Configuration
         uuid: '2903',
-        value: new Buffer([0, 0])  // broadcasts disabled
+        value: Buffer.from([0, 0])  // broadcasts disabled
       })
     ]
   });
@@ -53,7 +53,7 @@ HeartRateMeasurementCharacteristic.prototype.notify = function(event) {
   // 00010000 - 16  - 0x10 - RR-Interval present
   buffer.writeUInt8(0x01 | 0x02);
   if ('hr' in event) {
-    buffer.writeUInt8(Math.round(event.hr), 1);
+    buffer.writeUInt8(Math.round(event.hr) & 0xff, 1);
   }
   if (this._updateValueCallback) {
     this.lastBuffer = null;
@@ -61,7 +61,7 @@ HeartRateMeasurementCharacteristic.prototype.notify = function(event) {
   } else {
     this.lastBuffer = buffer;
   }
-}
+};
 
 
 module.exports = HeartRateMeasurementCharacteristic;

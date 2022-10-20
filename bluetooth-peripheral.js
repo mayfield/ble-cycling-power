@@ -1,17 +1,22 @@
 const CyclingPowerService = require('./cycling-power-service');
 const HeartRateService = require('./heart-rate-service');
+const RunningSpeedAndCadenceService = require('./running-speed-and-cadence-service');
 const bleno = require('bleno');
-const debug = require('debug')('ble');
 
 
 const BluetoothPeripheral = function(name) {
   process.env['BLENO_DEVICE_NAME'] = name;
   this.powerService = new CyclingPowerService();
   this.hrService = new HeartRateService();
+  this.runningService = new RunningSpeedAndCadenceService();
   this.rev_count = 0;
 
   this.start = function() {
-    bleno.startAdvertising(process.env['BLENO_DEVICE_NAME'], [this.powerService.uuid, this.hrService.uuid]);
+    bleno.startAdvertising(process.env['BLENO_DEVICE_NAME'], [
+        this.powerService.uuid,
+        this.hrService.uuid,
+        this.runningService.uuid,
+    ]);
   };
   this.stop = function() {
     bleno.stopAdvertising();
@@ -28,12 +33,10 @@ const BluetoothPeripheral = function(name) {
   });
 
   bleno.on('advertisingStart', error => {
-    debug('advertisingStart: ' + (error ? 'error ' + error : 'success'));
-    console.error("START START!!!!!");
-
+    console.info('BLE advertising start:', {error});
     if (!error) {
-      bleno.setServices([this.powerService, this.hrService], function(error){
-        debug('setServices: '  + (error ? 'error ' + error : 'success'));
+      bleno.setServices([this.powerService, this.hrService, this.runningService], function(error) {
+        console.info('setServices:', {error});
       });
     } else {
       console.error("Doh!", error);

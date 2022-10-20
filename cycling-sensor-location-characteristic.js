@@ -1,7 +1,6 @@
 const util = require('util');
 const bleno = require('bleno');
 
-const Descriptor = bleno.Descriptor;
 const Characteristic = bleno.Characteristic;
 
 // Profile:
@@ -13,7 +12,7 @@ const CyclingSensorLocationCharacteristic = function() {
   CyclingSensorLocationCharacteristic.super_.call(this, {
     uuid: '2A5D',
     properties: ['read'],
-    value: new Buffer([/*spider*/ 15])
+    value: Buffer.from([/*spider*/ 15])
   });
 };
 
@@ -21,7 +20,7 @@ util.inherits(CyclingSensorLocationCharacteristic, Characteristic);
 
 CyclingSensorLocationCharacteristic.prototype.onReadRequest = function(offset, callback) {
   // return hardcoded value
-  callback(this.RESULT_SUCCESS, new Buffer([/*spider*/ 15]));
+  callback(this.RESULT_SUCCESS, Buffer.alloc([/*spider*/ 15]));
 };
 
 module.exports = CyclingSensorLocationCharacteristic;

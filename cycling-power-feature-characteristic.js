@@ -1,10 +1,6 @@
 var util = require('util');
-var os = require('os');
-var exec = require('child_process').exec;
-
 var bleno = require('bleno');
 
-var Descriptor = bleno.Descriptor;
 var Characteristic = bleno.Characteristic;
 
 // Profile:
@@ -25,7 +21,7 @@ CyclingPowerFeatureCharacteristic.prototype.onReadRequest = function(offset, cal
   // 0010 - 0x02 - torque
   // 0100 - 0x04 - wheel revolutions
   // 1000 - 0x08 - crank revolutions
-  var value = new Buffer(4);
+  var value = Buffer.alloc(4);
   value.writeUInt32LE(0x08);
   callback(this.RESULT_SUCCESS, value);
 };

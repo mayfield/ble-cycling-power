@@ -1,5 +1,4 @@
 const util = require('util');
-const debug = require('debug')('pm');
 const bleno = require('bleno');
 
 const Descriptor = bleno.Descriptor;
@@ -16,12 +15,12 @@ var CyclingPowerMeasurementCharacteristic = function() {
       new Descriptor({
         // Client Characteristic Configuration
         uuid: '2902',
-        value: new Buffer([1, 0])  // notifications enabled
+        value: Buffer.from([1, 0])  // notifications enabled
       }),
       new Descriptor({
         // Server Characteristic Configuration
         uuid: '2903',
-        value: new Buffer([0, 0])  // broadcasts disabled
+        value: Buffer.from([0, 0])  // broadcasts disabled
       })
     ]
   });
@@ -48,7 +47,7 @@ CyclingPowerMeasurementCharacteristic.prototype.onUnsubscribe = function() {
 };
 
 CyclingPowerMeasurementCharacteristic.prototype.notify = function(event) {
-  const buffer = new Buffer(8);
+  const buffer = Buffer.alloc(8);
   // flags
   // 00000001 - 1   - 0x001 - Pedal Power Balance Present
   // 00000010 - 2   - 0x002 - Pedal Power Balance Reference
@@ -89,6 +88,6 @@ CyclingPowerMeasurementCharacteristic.prototype.notify = function(event) {
   } else {
     this.lastBuffer = buffer;
   }
-}
+};
 
 module.exports = CyclingPowerMeasurementCharacteristic;
