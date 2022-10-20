@@ -5,7 +5,7 @@ const os = require('os');
 
 let wattsBasis = parseInt(process.argv[2] || 100);
 let cadenceBasis = 60;
-let hrBasis = 80;
+let hrBasis = 100;
 let speedBasis = 5;
 const jitter = Number(process.argv[3] || 0.2);
 const signwave = !!process.argv[4];
@@ -98,7 +98,7 @@ async function main() {
             hrBasis = Math.min(120, hrBasis + 5);
             console.log("Increase HR basis:", hrBasis);
         } else if (key === "H") {
-            hrBasis = Math.max(40, hrBasis - 5);
+            hrBasis = Math.max(60, hrBasis - 5);
             console.log("Decrease HR basis:", hrBasis);
         } else if (key === "s") {
             speedBasis = Math.min(10, speedBasis + 0.25);
@@ -119,7 +119,7 @@ async function main() {
         watts += jitter * (Math.random() - 0.5) * watts;
         watts = Math.max(0, Math.round(watts));
         let runSpeed = speedRolling(speedBasis + (12 * (Math.min(watts, 500) / 500)) + (Math.random() * 1));
-        const hr = hrRolling(hrBasis + (90 * (Math.min(watts, 500) / 500)) + (Math.random() * 20));
+        const hr = hrRolling(hrBasis + (100 * (Math.min(watts, 500) / 600)) + (Math.random() * 50) - 25);
         let cadence = cadenceRolling(cadenceBasis + (40 * (Math.min(watts, 400) / 400)) + (Math.random() * 10));
         if (bigGear) {
             cadence *= 0.75;
