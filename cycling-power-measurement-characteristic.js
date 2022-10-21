@@ -78,7 +78,7 @@ CyclingPowerMeasurementCharacteristic.prototype.notify = function(event) {
     this._lastRevTime = revTime;
   }
   if (revCount !== undefined) {
-    buffer.writeUInt16LE(revCount, 4);
+    buffer.writeUInt16LE(revCount & 0xffff, 4);
     const btTime = Math.round(revTime * 1024) & 0xffff;
     buffer.writeUInt16LE(btTime, 6);
   }
