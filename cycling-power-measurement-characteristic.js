@@ -1,44 +1,19 @@
 const util = require('util');
 const bleno = require('bleno');
 
-const Descriptor = bleno.Descriptor;
-const Characteristic = bleno.Characteristic;
-
-// Spec
-//https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.cycling_power_measurement.xml
 
 var CyclingPowerMeasurementCharacteristic = function() {
-  CyclingPowerMeasurementCharacteristic.super_.call(this, {
-    uuid: '2A63',
-    properties: ['notify'],
-    descriptors: [
-      new Descriptor({
-        // Client Characteristic Configuration
-        uuid: '2902',
-        value: Buffer.from([1, 0])  // notifications enabled
-      }),
-      new Descriptor({
-        // Server Characteristic Configuration
-        uuid: '2903',
-        value: Buffer.from([0, 0])  // broadcasts disabled
-      })
-    ]
-  });
-
-  this._updateValueCallback = null;
+    CyclingPowerMeasurementCharacteristic.super_.call(this, {
+        uuid: '2A63',
+        properties: ['read', 'notify'],
+    });
+    this._updateValueCallback = null;
 };
-
-util.inherits(CyclingPowerMeasurementCharacteristic, Characteristic);
+util.inherits(CyclingPowerMeasurementCharacteristic, bleno.Characteristic);
 
 CyclingPowerMeasurementCharacteristic.prototype.onSubscribe = function(maxValueSize, updateValueCallback) {
   console.log('[BLE] client subscribed to PM');
   this._updateValueCallback = updateValueCallback;
-  if (this.lastBuffer) {
-    console.warn("Sending last good buffer to newly subscribed client");
-    const buffer = this.lastBuffer;
-    this.lastBuffer = null;
-    updateValueCallback(buffer);
-  }
 };
 
 CyclingPowerMeasurementCharacteristic.prototype.onUnsubscribe = function() {
@@ -55,14 +30,10 @@ CyclingPowerMeasurementCharacteristic.prototype.notify = function(event) {
   // 00001000 - 8   - 0x008 - Accumulated Torque Source
   // 00010000 - 16  - 0x010 - Wheel Revolution Data Present
   // 00100000 - 32  - 0x020 - Crank Revolution Data Present
-  // 01000000 - 64  - 0x040 - Extreme Force Magnitudes Present
-  // 10000000 - 128 - 0x080 - Extreme Torque Magnitudes Present
-  buffer.writeUInt16LE(0x020, 0);
+  buffer.writeUInt16LE(0x020);
   if ('watts' in event) {
-    const watts = event.watts;
-    buffer.writeInt16LE(Math.round(watts), 2);
+    buffer.writeInt16LE(Math.min(0xffff, Math.round(event.watts)), 2);
   }
-
   let revCount;
   let revTime;
   if ('cadence' in event) {
@@ -83,10 +54,7 @@ CyclingPowerMeasurementCharacteristic.prototype.notify = function(event) {
     buffer.writeUInt16LE(btTime, 6);
   }
   if (this._updateValueCallback) {
-    this.lastBuffer = null;
     this._updateValueCallback(buffer);
-  } else {
-    this.lastBuffer = buffer;
   }
 };
 

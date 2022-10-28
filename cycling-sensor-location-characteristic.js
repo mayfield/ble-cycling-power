@@ -18,9 +18,4 @@ const CyclingSensorLocationCharacteristic = function() {
 
 util.inherits(CyclingSensorLocationCharacteristic, Characteristic);
 
-CyclingSensorLocationCharacteristic.prototype.onReadRequest = function(offset, callback) {
-  // return hardcoded value
-  callback(this.RESULT_SUCCESS, Buffer.alloc([/*spider*/ 15]));
-};
-
 module.exports = CyclingSensorLocationCharacteristic;

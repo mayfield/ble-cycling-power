@@ -5,10 +5,10 @@ const os = require('os');
 
 let wattsBasis = parseInt(process.argv[2] || 100);
 let cadenceBasis = 60;
-let hrBasis = 100;
+let hrBasis = 105;
 let speedBasis = 5;
-const jitter = Number(process.argv[3] || 0.2);
-const signwave = !!process.argv[4];
+const jitterPct = Number(process.argv[3] || 0.2);
+const signwave = !!(process.argv[4] && JSON.parse(process.argv[4]));
 const name = os.hostname();
 const peripheral = new bcp.BluetoothPeripheral(name);
 
@@ -17,15 +17,21 @@ function sleep(ms) {
 }
 
 
-function rolling(windowSize) {
+function jitter(value) {
+    const basis = jitterPct * value;
+    return Math.round((Math.random() * basis) - (basis / 2));
+}
+
+
+function rolling(size) {
     let history = [];
+    let i = 0;
+    let sum = 0;
     return function(value) {
-        while (history.length < windowSize) {
-            history.push(value);
-        }
-        history.unshift(value);
-        history.length = windowSize;
-        return history.reduce((agg, x) => agg + x, 0) / history.length;
+        sum -= history[i % size] || 0;
+        sum += value;
+        history[i++ % size] = value;
+        return sum / history.length;
     };
 }
 
@@ -43,11 +49,14 @@ async function main() {
     let total = 0;
     const powerMeter = peripheral.powerService.pm;
     global.powerMeter = powerMeter;
+    let connected;
     bleno.on('accept', clientAddress => {
         warn('Connected client:', clientAddress);
+        connected = true;
     });
     bleno.on('disconnect', clientAddress => {
         warn('Disconnected client:', clientAddress);
+        connected = false;
     });
 
     /* At least with zwift things go side ways sometimes and we must reset..
@@ -111,19 +120,18 @@ async function main() {
 
     let lastWatts;
     setInterval(() => {
+        if (!connected) {
+            return;
+        }
         iterations++;
         let watts = wattsBasis;
         if (signwave) {
             watts += wattsBasis * 0.2 * Math.sin(Date.now() / 1000 / 15);
         }
-        watts += jitter * (Math.random() - 0.5) * watts;
-        watts = Math.max(0, Math.round(watts));
-        let runSpeed = speedRolling(speedBasis + (12 * (Math.min(watts, 500) / 500)) + (Math.random() * 1));
-        const hr = hrRolling(hrBasis + (100 * (Math.min(watts, 500) / 600)) + (Math.random() * 50) - 25);
-        let cadence = cadenceRolling(cadenceBasis + (40 * (Math.min(watts, 400) / 400)) + (Math.random() * 10));
-        if (bigGear) {
-            cadence *= 0.75;
-        }
+        watts = Math.max(0, Math.round(watts + jitter(watts)));
+        let runSpeed = Math.max(0, speedRolling(speedBasis + (13 * (Math.min(watts, 500) / 500)) + jitter(2)));
+        const hr = Math.max(0, hrRolling(hrBasis + (100 * (Math.min(watts, 500) / 500)) + jitter(50)));
+        let cadence = Math.max(0, cadenceRolling(cadenceBasis + (40 * (Math.min(watts, 400) / 400)) + jitter(10)));
         if (!watts) {
             cadence = 0;
             runSpeed = 0;
@@ -131,18 +139,22 @@ async function main() {
         if (Math.random() < 0.05) {
             bigGear = !bigGear;
         }
+        const bikeCadence = bigGear ? cadence * 0.75 : cadence;
         if (unsubTime && (Date.now() - unsubTime) > 998) {
             warn('Last reading was dropped!');
             total -= lastWatts;
         }
         lastWatts = watts;
         total += watts;
-        console.info(`[${name}]: iter:${iterations}, cur:${watts}w, avg:${Math.round(total / iterations)}w, ` +
-                     `watt-basis:${wattsBasis}, hr:${Math.round(hr)}, cadence:${Math.round(cadence)} ` +
-                     `run-speed:${Math.round(runSpeed)} ${bigGear ? ' [Big Gear]' : ''}`);
-        peripheral.powerService.notify({watts, cadence});
+        const perMile = 3600 / (runSpeed * 1000 / 1609.34);
+        const runPace = `${perMile / 60 | 0}:${Math.trunc(perMile % 60).toString().padStart(2, '0')}/mi`
+        console.info(`iter:${iterations}, cur:${watts}w, avg:${Math.round(total / iterations)}w, ` +
+                     `watt-basis:${wattsBasis}, hr:${Math.round(hr)}, rpm:${Math.round(bikeCadence)} ` +
+                     `spm:${Math.round(cadence * 1.8)}, run-pace:${runPace} ` +
+                     `${bigGear ? ' [Big Gear]' : ''}`);
+        peripheral.powerService.notify({watts, cadence: bikeCadence});
         peripheral.hrService.notify({hr});
-        peripheral.runningService.notify({speed: runSpeed, cadence: cadence * 1.8 / (bigGear ? 0.75 : 1)});
+        peripheral.runningService.notify({speed: runSpeed, cadence: cadence * 1.8});
     }, 1000);
 }
 
