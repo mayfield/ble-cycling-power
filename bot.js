@@ -1,16 +1,40 @@
 const bcp = require('./');
 const bleno = require('bleno');
 const os = require('os');
-
+const fetch = require('node-fetch');
+const express = require('express');
 
 let wattsBasis = parseInt(process.argv[2] || 100);
 let cadenceBasis = 60;
 let hrBasis = 105;
 let speedBasis = 5;
 const jitterPct = Number(process.argv[3] || 0.2);
-const signwave = !!(process.argv[4] && JSON.parse(process.argv[4]));
+const signwave = false;
 const name = os.hostname();
 const peripheral = new bcp.BluetoothPeripheral(name);
+
+
+async function sauceRPC(name, ...args) {
+    const r = fetch(`http://jm:1080/api/rpc/${func}`, {
+        method: 'POST',
+        body: JSON.stringify(args)
+    });
+    const env = await r.json();
+    if (env.success) {
+        return env.value;
+    } else {
+        console.error(env);
+        throw new Error(env.error.name);
+    }
+}
+
+
+function adjPower(delta, {min=0, max=1200}={}) {
+    const desired = wattsBasis + delta;
+    wattsBasis = Math.max(min, Math.min(max, desired));
+    return wattsBasis;
+}
+
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -83,6 +107,18 @@ async function main() {
     const cadenceRolling = rolling(8);
     let bigGear = false;
 
+    const webApp = express();
+    webApp.use(express.json({strict: false}));
+    webApp.get('/api/power', (req, res) => {
+        res.json(wattsBasis);
+    });
+    webApp.put('/api/power', (req, res) => {
+        wattsBasis = req.body;
+        res.status(204);
+        res.send();
+    });
+    webApp.listen(2080);
+
     const stdin = process.openStdin();
     stdin.setRawMode(true);
     stdin.setEncoding('ascii');
@@ -148,14 +184,14 @@ async function main() {
         total += watts;
         const perMile = 3600 / (runSpeed * 1000 / 1609.34);
         const runPace = `${perMile / 60 | 0}:${Math.trunc(perMile % 60).toString().padStart(2, '0')}/mi`
-        console.info(`iter:${iterations}, cur:${watts}w, avg:${Math.round(total / iterations)}w, ` +
-                     `watt-basis:${wattsBasis}, hr:${Math.round(hr)}, rpm:${Math.round(bikeCadence)} ` +
-                     `spm:${Math.round(cadence * 1.8)}, run-pace:${runPace} ` +
-                     `${bigGear ? ' [Big Gear]' : ''}`);
+        console.debug(`iter:${iterations}, cur:${watts}w, avg:${Math.round(total / iterations)}w, ` +
+                      `watt-basis:${wattsBasis}, hr:${Math.round(hr)}, rpm:${Math.round(bikeCadence)} ` +
+                      `spm:${Math.round(cadence * 1.8)}, run-pace:${runPace} ` +
+                      `${bigGear ? ' [Big Gear]' : ''}`);
         peripheral.powerService.notify({watts, cadence: bikeCadence});
         peripheral.hrService.notify({hr});
         peripheral.runningService.notify({speed: runSpeed, cadence: cadence * 1.8});
     }, 1000);
 }
 
-main().catch(() => process.exit(1));
+main();
