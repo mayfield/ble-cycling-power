@@ -108,10 +108,10 @@ async function main() {
             }
             const speedDelta = ourAthlete.state.speed - ourGroup.speed;
             const powerDelta = ourGroup.power / Math.max(1, ourAthlete.state.power);
-            if (speedDelta > 1) {
-                console.warn("Slowing down to avoid overshooting:", adjust(speedDelta * -4));
-            } else if (speedDelta < -1) {
-                console.error("Speeding up to avoid getting dropped:", adjust(speedDelta * -4));
+            if (speedDelta > 2) {
+                console.warn("Slowing down to avoid overshooting:", adjust(speedDelta * -8));
+            } else if (speedDelta < -2) {
+                console.error("Speeding up to avoid getting dropped:", adjust(speedDelta * -8));
             } else {
                 const ourPos = ourGroup.athletes.findIndex(x => x.self);
                 const placement = ourPos / (ourGroup.athletes.length - 1);
