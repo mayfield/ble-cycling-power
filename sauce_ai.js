@@ -74,8 +74,8 @@ async function botAPI(name, options={}) {
     const r = await fetch(`http://127.0.0.1:2080/api/${name}`, {
         headers: {"content-type": "application/json"},
         ...options,
-        method: options.method || options.json ? 'PUT' : 'GET',
-        body: options.json ? JSON.stringify(options.json) : options.body,
+        method: options.method || options.json !== undefined ? 'PUT' : 'GET',
+        body: options.json !== undefined ? JSON.stringify(options.json) : options.body,
     });
     if (r.status !== 204) {
         return await r.json();
@@ -85,6 +85,9 @@ async function botAPI(name, options={}) {
 
 function adjPower(power, {min=0, max=1200}={}) {
     power = Math.max(min, Math.min(max, power));
+    if (power < 40) {
+        power = 0; // < 40 is suspect
+    }
     botAPI('power', {json: power});
     return power;
 }
@@ -109,9 +112,9 @@ async function main() {
             const speedDelta = ourAthlete.state.speed - ourGroup.speed;
             const powerDelta = ourGroup.power / Math.max(1, ourAthlete.state.power);
             if (speedDelta > 2) {
-                console.warn("Slowing down to avoid overshooting:", adjust(speedDelta * -8));
+                console.warn("Slowing down to avoid overshooting:", adjust(speedDelta * -6));
             } else if (speedDelta < -2) {
-                console.error("Speeding up to avoid getting dropped:", adjust(speedDelta * -8));
+                console.error("Speeding up to avoid getting dropped:", adjust(speedDelta * -6));
             } else {
                 const ourPos = ourGroup.athletes.findIndex(x => x.self);
                 const placement = ourPos / (ourGroup.athletes.length - 1);
