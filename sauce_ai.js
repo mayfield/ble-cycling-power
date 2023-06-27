@@ -85,8 +85,8 @@ async function botAPI(name, options={}) {
 
 function adjPower(power, {min=0, max=1200}={}) {
     power = Math.max(min, Math.min(max, power));
-    if (power < 40) {
-        power = 0; // < 40 is suspect
+    if (power < 30) {
+        power = 0; // small numbers are suspect
     }
     botAPI('power', {json: power});
     return power;
@@ -97,14 +97,35 @@ async function main() {
     const sauceGroups = await sauceSubscribe('groups');
     sauceGroups.on('data', async groups => {
         const curPower = await botAPI('power');
-        const limits = {min: Math.min(0, curPower), max: Math.max(580, curPower)};
-        const adjust = x => adjPower(curPower + x, limits);
         const ourGroup = groups.find(x => x.athletes.some(x => x.self));
-        if (!ourGroup) {
+        if (!ourGroup || groups.length < 2) {
             return;
         }
         const ourAthlete = ourGroup.athletes.find(x => x.self);
-        const targetGroup = Array.from(groups).sort((a, b) => b.athletes.length - a.athletes.length)[0];
+        const wBalNorm = Math.min(1, Math.max(0, ((ourAthlete.stats.wBal || 10000) / 20000) ** 0.5));
+        const max = Math.max(900, curPower) * wBalNorm;
+        const limits = {min: Math.min(0, curPower), max};
+        const adjust = x => adjPower(curPower + x, limits);
+        const prioGroups = Array.from(groups).sort((a, b) => {
+            let aPrio = a.athletes.length;
+            let bPrio = b.athletes.length;
+            aPrio /= Math.log(2 + Math.abs(a.gap * 0.8));
+            bPrio /= Math.log(2 + Math.abs(b.gap * 0.8));
+            aPrio *= a.gap < 0 ? 1.15 : a.gap > 0 ? 0.9 : 1;
+            bPrio *= b.gap < 0 ? 1.15 : b.gap > 0 ? 0.9 : 1;
+            a.prio = aPrio;
+            b.prio = bPrio;
+            return bPrio - aPrio;
+        });
+        const targetGroup = prioGroups[0];
+        console.log();
+        for (const x of prioGroups) {
+            const offt = groups.indexOf(ourGroup);
+            console.log((groups.indexOf(x) - offt).toString().padStart(3),
+                        'prio:', ''.padStart(x.prio / Math.max(prioGroups[0].prio, 15) * 30, '#').padEnd(30),
+                        x.prio.toFixed(1).padStart(4), 'size:', x.athletes.length.toString().padStart(3),
+                        'gap:', x.gap.toFixed(0));
+        }
         if (ourGroup === targetGroup) {
             if (ourGroup.athletes.length < 2) {
                 return;
@@ -119,9 +140,9 @@ async function main() {
                 const ourPos = ourGroup.athletes.findIndex(x => x.self);
                 const placement = ourPos / (ourGroup.athletes.length - 1);
                 if (placement < 0.5) {
-                    console.warn("Slide back:", adjust((0.5 - placement) / 0.5 * powerDelta * -2));
+                    console.warn("Slide back:", adjust((0.5 - placement) / 0.5 * powerDelta * -2).toFixed(1));
                 } else {
-                    console.error("Nudge forward:", adjust((placement - 0.5) / 0.5 * powerDelta * 2));
+                    console.error("Nudge forward:", adjust((placement - 0.5) / 0.5 * powerDelta * 2).toFixed(1));
                 }
             }
         } else {
@@ -131,21 +152,21 @@ async function main() {
             const speedDelta = ourAthlete.state.speed - targetGroup.speed;
             const gap = Math.abs(targetGroup.gap - ourGroup.gap);
             const targetSpeed = targetGroup.speed + dir + (Math.min(10, gap * 0.25) * dir);
-            const powerDelta = (targetSpeed - ourAthlete.state.speed) ** 2 *
+            const powerDelta = Math.max(-4, Math.min(10, targetSpeed - ourAthlete.state.speed)) ** 2 *
                 Math.sign(targetSpeed - ourAthlete.state.speed);
             console.log({targetSpeed, powerDelta, dir, gap}, 'ourspeed', ourAthlete.state.speed);
             const power = adjust(powerDelta);
             if (dir > 0) {
                 if (powerDelta < 0) {
-                    console.warn("Throttle back chase:", power);
+                    console.warn("Throttle back chase:", power.toFixed(1));
                 } else {
-                    console.error("Increasing chase effort:", power);
+                    console.error("Increasing chase effort:", power.toFixed(1));
                 }
             } else {
                 if (powerDelta < 0) {
-                    console.warn("Slowing for group behind:", power);
+                    console.warn("Slowing for group behind:", power.toFixed(1));
                 } else {
-                    console.error("Speeding up to avoid overtake:", power);
+                    console.error("Speeding up to avoid overtake:", power.toFixed(1));
                 }
             }
         }

@@ -1,6 +1,7 @@
 const {CyclingPowerService} = require('./cycling-power-service');
 const HeartRateService = require('./heart-rate-service');
 const RunningSpeedAndCadenceService = require('./running-speed-and-cadence-service');
+const DeviceInformationService = require('./device-information-service');
 const bleno = require('bleno');
 
 
@@ -33,9 +34,12 @@ const BluetoothPeripheral = function(name) {
   bleno.on('advertisingStart', error => {
     console.info('BLE advertising start:', {error});
     if (!error) {
-      bleno.setServices([this.powerService, this.hrService, this.runningService], function(error) {
-        console.info('setServices:', {error});
-      });
+      bleno.setServices([
+        new DeviceInformationService(),
+        this.powerService,
+        this.hrService,
+        this.runningService
+      ], error => console.info('setServices:', {error}));
     } else {
       console.error("Doh!", error);
     }
