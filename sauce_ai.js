@@ -119,7 +119,7 @@ async function main() {
         });
         const targetGroup = prioGroups[0];
         console.log();
-        for (const x of prioGroups) {
+        for (const x of prioGroups.slice(0, 5)) {
             const offt = groups.indexOf(ourGroup);
             console.log((groups.indexOf(x) - offt).toString().padStart(3),
                         'prio:', ''.padStart(x.prio / Math.max(prioGroups[0].prio, 15) * 30, '#').padEnd(30),
@@ -128,32 +128,36 @@ async function main() {
         }
         if (ourGroup === targetGroup) {
             if (ourGroup.athletes.length < 2) {
+                console.log('early bail');
                 return;
             }
             const speedDelta = ourAthlete.state.speed - ourGroup.speed;
             const powerDelta = ourGroup.power / Math.max(1, ourAthlete.state.power);
+            console.log({powerDelta, speedDelta, speedDelta, os: ourAthlete.state.speed, gs: ourGroup.speed});
             if (speedDelta > 2) {
-                console.warn("Slowing down to avoid overshooting:", adjust(speedDelta * -6));
+                console.warn("Slowing down to avoid overshooting:", adjust(speedDelta * -2));
             } else if (speedDelta < -2) {
                 console.error("Speeding up to avoid getting dropped:", adjust(speedDelta * -6));
             } else {
                 const ourPos = ourGroup.athletes.findIndex(x => x.self);
                 const placement = ourPos / (ourGroup.athletes.length - 1);
-                if (placement < 0.5) {
+                if (placement < 0.3) {
                     console.warn("Slide back:", adjust((0.5 - placement) / 0.5 * powerDelta * -2).toFixed(1));
-                } else {
+                } else if (placement > 0.7) {
                     console.error("Nudge forward:", adjust((placement - 0.5) / 0.5 * powerDelta * 2).toFixed(1));
+                } else {
+                    console.log("perfect:", curPower.toFixed(1));
                 }
             }
         } else {
             const gIndex = groups.indexOf(ourGroup);
             const targetIndex = groups.indexOf(targetGroup);
             const dir = targetIndex < gIndex ? 1 : -1;
-            const speedDelta = ourAthlete.state.speed - targetGroup.speed;
             const gap = Math.abs(targetGroup.gap - ourGroup.gap);
             const targetSpeed = targetGroup.speed + dir + (Math.min(10, gap * 0.25) * dir);
-            const powerDelta = Math.max(-4, Math.min(10, targetSpeed - ourAthlete.state.speed)) ** 2 *
-                Math.sign(targetSpeed - ourAthlete.state.speed);
+            const speedDelta = targetSpeed - ourAthlete.state.speed;
+            const powerDelta = Math.max(-4, Math.min(10, Math.abs(speedDelta) ** 1.5 * Math.sign(speedDelta)));
+            console.log({powerDelta, speedDelta, speedDelta, os: ourAthlete.state.speed, gs: ourGroup.speed});
             console.log({targetSpeed, powerDelta, dir, gap}, 'ourspeed', ourAthlete.state.speed);
             const power = adjust(powerDelta);
             if (dir > 0) {
