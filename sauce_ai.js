@@ -93,60 +93,81 @@ function adjPower(power, {min=0, max=1200}={}) {
 }
 
 
+
+
 async function main() {
     const sauceGroups = await sauceSubscribe('groups');
     sauceGroups.on('data', async groups => {
         const curPower = await botAPI('power');
         const ourGroup = groups.find(x => x.athletes.some(x => x.self));
-        if (!ourGroup || groups.length < 2) {
+        if (!ourGroup) {
             return;
         }
         const ourAthlete = ourGroup.athletes.find(x => x.self);
-        const wBalNorm = Math.min(1, Math.max(0, ((ourAthlete.stats.wBal || 10000) / 20000) ** 0.5));
-        const max = Math.max(900, curPower) * wBalNorm;
+        const ftp = ourAthlete.athlete?.ftp || 200;
+        const wPrime = (ourAthlete.athlete?.wPrime || 20000);
+        const wBal = Math.round(ourAthlete.stats.wBal || 10000);
+        const wBalAdj = Math.round(wBal - Math.min(wPrime * 0.75, ourAthlete.state.time * 1.5));
+        const wBalNorm = Math.round(Math.min(1, Math.max(0, (wBalAdj / wPrime))) * 25) / 25;
+        const max = Math.round(Math.max(1200, curPower) * wBalNorm + (ftp / 2));
+        console.log({wBal, wBalAdj, wBalNorm, wPrime, max, ftp});
         const limits = {min: Math.min(0, curPower), max};
-        const adjust = x => adjPower(curPower + x, limits);
-        const prioGroups = Array.from(groups).sort((a, b) => {
-            let aPrio = a.athletes.length;
-            let bPrio = b.athletes.length;
-            aPrio /= Math.log(2 + Math.abs(a.gap * 0.8));
-            bPrio /= Math.log(2 + Math.abs(b.gap * 0.8));
-            aPrio *= a.gap < 0 ? 1.15 : a.gap > 0 ? 0.9 : 1;
-            bPrio *= b.gap < 0 ? 1.15 : b.gap > 0 ? 0.9 : 1;
-            a.prio = aPrio;
-            b.prio = bPrio;
-            return bPrio - aPrio;
-        });
+        const adjust = (d, reason) => {
+            const pwr = adjPower(curPower + d, limits);
+            console.log(`[max: ${max}, wBal: ${wBal}, wBalAdj: ${wBalAdj-wBal}, wBalNorm: ${wBalNorm}]`);
+            console.log(`${d ? d > 0 ? '+' : '' : '+'}${d.toFixed(1)}w (${pwr.toFixed(0)}w): ${reason}`);
+            return pwr;
+        };
+        for (const x of groups) {
+            x.prio = Math.log2(1 + x.athletes.length - (x.gap === 0 ? 0.5 : 0)) ;
+            x.prio *= x.gap < 0 ? 30 / -x.gap : x.gap > 0 ? 10 / x.gap : 1;
+        }
+        const prioGroups = Array.from(groups).sort((a, b) => b.prio - a.prio);
         const targetGroup = prioGroups[0];
         console.log();
+        console.log('------------------------------------------------------');
+        console.log();
+        console.log('POS |                      PRIO |  SZ |   GAP |    SPD');
         for (const x of prioGroups.slice(0, 5)) {
             const offt = groups.indexOf(ourGroup);
             console.log((groups.indexOf(x) - offt).toString().padStart(3),
-                        'prio:', ''.padStart(x.prio / Math.max(prioGroups[0].prio, 15) * 30, '#').padEnd(30),
-                        x.prio.toFixed(1).padStart(4), 'size:', x.athletes.length.toString().padStart(3),
-                        'gap:', x.gap.toFixed(0));
+                        '|', ''.padStart(x.prio / Math.max(prioGroups[0].prio, 15) * 20, '#').padEnd(20),
+                             x.prio.toFixed(1).padStart(4),
+                        '|', x.athletes.length.toString().padStart(3),
+                        '|', x.gap.toFixed(0).padStart(4) + 's',
+                        '|', x.speed.toFixed(0).padStart(3) + 'kph'
+            );
         }
+        console.log();
         if (ourGroup === targetGroup) {
             if (ourGroup.athletes.length < 2) {
-                console.log('early bail');
+                adjust(Math.random() > 0.98 ? 1000 : Math.random() * 100, 'Solo time trial');
                 return;
             }
             const speedDelta = ourAthlete.state.speed - ourGroup.speed;
             const powerDelta = ourGroup.power / Math.max(1, ourAthlete.state.power);
-            console.log({powerDelta, speedDelta, speedDelta, os: ourAthlete.state.speed, gs: ourGroup.speed});
+            //console.log({powerDelta, speedDelta, speedDelta, os: ourAthlete.state.speed, gs: ourGroup.speed});
             if (speedDelta > 2) {
-                console.warn("Slowing down to avoid overshooting:", adjust(speedDelta * -2));
+                adjust(speedDelta * -2.5, 'Slowing down to avoid overshooting');
             } else if (speedDelta < -2) {
-                console.error("Speeding up to avoid getting dropped:", adjust(speedDelta * -6));
+                adjust(speedDelta * -6, 'Speeding up to avoid getting dropped');
             } else {
                 const ourPos = ourGroup.athletes.findIndex(x => x.self);
                 const placement = ourPos / (ourGroup.athletes.length - 1);
                 if (placement < 0.3) {
-                    console.warn("Slide back:", adjust((0.5 - placement) / 0.5 * powerDelta * -2).toFixed(1));
+                    if (speedDelta < 0) {
+                        adjust(0, 'Slide back paused to avoid getting dropped');
+                    } else {
+                        adjust((0.5 - placement) / 0.5 * powerDelta * -2.5, 'Slide back');
+                    }
                 } else if (placement > 0.7) {
-                    console.error("Nudge forward:", adjust((placement - 0.5) / 0.5 * powerDelta * 2).toFixed(1));
+                    if (speedDelta > 0) {
+                        adjust(0, 'Nudge forward paused to avoid overshoot');
+                    } else {
+                        adjust((placement - 0.5) / 0.5 * powerDelta * 2.5, 'Nudge forward'); 
+                    }
                 } else {
-                    console.log("perfect:", curPower.toFixed(1));
+                    adjust(0, 'Perfect');
                 }
             }
         } else {
@@ -157,22 +178,23 @@ async function main() {
             const targetSpeed = targetGroup.speed + dir + (Math.min(10, gap * 0.25) * dir);
             const speedDelta = targetSpeed - ourAthlete.state.speed;
             const powerDelta = Math.max(-4, Math.min(10, Math.abs(speedDelta) ** 1.5 * Math.sign(speedDelta)));
-            console.log({powerDelta, speedDelta, speedDelta, os: ourAthlete.state.speed, gs: ourGroup.speed});
-            console.log({targetSpeed, powerDelta, dir, gap}, 'ourspeed', ourAthlete.state.speed);
-            const power = adjust(powerDelta);
+            //console.log({powerDelta, speedDelta, speedDelta, os: ourAthlete.state.speed, gs: ourGroup.speed});
+            //console.log({targetSpeed, powerDelta, dir, gap}, 'ourspeed', ourAthlete.state.speed);
+            let reason;
             if (dir > 0) {
                 if (powerDelta < 0) {
-                    console.warn("Throttle back chase:", power.toFixed(1));
+                    reason = 'Throttle back chase';
                 } else {
-                    console.error("Increasing chase effort:", power.toFixed(1));
+                    reason = 'Increasing chase effort';
                 }
             } else {
                 if (powerDelta < 0) {
-                    console.warn("Slowing for group behind:", power.toFixed(1));
+                    reason = 'Slowing for group behind';
                 } else {
-                    console.error("Speeding up to avoid overtake:", power.toFixed(1));
+                    reason = 'Speeding up to avoid overtake';
                 }
             }
+            adjust(powerDelta, reason);
         }
     });
 }
