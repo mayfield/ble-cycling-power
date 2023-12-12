@@ -2,6 +2,8 @@ const fetch = require('node-fetch');
 const WebSocket = require('ws');
 const events = require('events');
 
+const sauceURL = 'ws://127.0.0.1:1080/api/ws/events';
+
 let _sauceWs;
 let _sauceWsId = 0;
 const _sauceEmitters = new Map();
@@ -10,12 +12,13 @@ const _sauceRequests = new Map();
 async function sauceSubscribe(event) {
     let ws = _sauceWs;
     if (!ws) {
-        ws = new WebSocket('ws://127.0.0.1:1080/api/ws/events');
-        ws.on('close', () => {
-            console.warn("Sauce websocket closed");
-            if (ws === _sauceWs) {
+        ws = new WebSocket(sauceURL);
+        ws.on('close', code => {
+            console.warn("Sauce websocket closed:", code);
+            process.exit(1);
+            /*if (ws === _sauceWs) {
                 _sauceWs = null;
-            }
+            }*/
         });
         ws.on('message', buf => {
             const msg = JSON.parse(buf);
@@ -46,6 +49,7 @@ async function sauceSubscribe(event) {
             ws.on('error', reject);
             ws.on('open', resolve);
         });
+        console.log("Sauce websocket connected:", sauceURL);
         _sauceWs = ws;
     }
     _sauceWsId++;
@@ -66,6 +70,7 @@ async function sauceSubscribe(event) {
     const emitter = new events.EventEmitter();
     _sauceEmitters.set(subId, emitter);
     await subReq;
+    console.log("Sauce ws subscribed to:", event);
     return emitter;
 }
 
@@ -119,8 +124,8 @@ async function main() {
             return pwr;
         };
         for (const x of groups) {
-            x.prio = Math.log2(1 + x.athletes.length - (x.gap === 0 ? 0.5 : 0)) ;
-            x.prio *= x.gap < 0 ? 30 / -x.gap : x.gap > 0 ? 10 / x.gap : 1;
+            x.prio = Math.log2(1 + x.athletes.length);
+            x.prio *= x.gap < 0 ? 30 / -x.gap : x.gap > 0 ? 5 / x.gap : 2;
         }
         const prioGroups = Array.from(groups).sort((a, b) => b.prio - a.prio);
         const targetGroup = prioGroups[0];
@@ -147,22 +152,22 @@ async function main() {
             const speedDelta = ourAthlete.state.speed - ourGroup.speed;
             const powerDelta = ourGroup.power / Math.max(1, ourAthlete.state.power);
             //console.log({powerDelta, speedDelta, speedDelta, os: ourAthlete.state.speed, gs: ourGroup.speed});
-            if (speedDelta > 2) {
-                adjust(speedDelta * -2.5, 'Slowing down to avoid overshooting');
-            } else if (speedDelta < -2) {
+            if (speedDelta > 1.5) {
+                adjust(speedDelta * -4, 'Slowing down to avoid overshooting');
+            } else if (speedDelta < -1.5) {
                 adjust(speedDelta * -6, 'Speeding up to avoid getting dropped');
             } else {
                 const ourPos = ourGroup.athletes.findIndex(x => x.self);
                 const placement = ourPos / (ourGroup.athletes.length - 1);
                 if (placement < 0.3) {
-                    if (speedDelta < 0) {
-                        adjust(0, 'Slide back paused to avoid getting dropped');
+                    if (speedDelta < -0.4) {
+                        adjust(0, 'Paused slide back to avoid getting dropped');
                     } else {
                         adjust((0.5 - placement) / 0.5 * powerDelta * -2.5, 'Slide back');
                     }
                 } else if (placement > 0.7) {
-                    if (speedDelta > 0) {
-                        adjust(0, 'Nudge forward paused to avoid overshoot');
+                    if (speedDelta > 0.2) {
+                        adjust(0, 'Paused nudge forward to avoid overshoot');
                     } else {
                         adjust((placement - 0.5) / 0.5 * powerDelta * 2.5, 'Nudge forward'); 
                     }
