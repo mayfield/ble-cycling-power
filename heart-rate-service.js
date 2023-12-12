@@ -1,19 +1,21 @@
-const util = require('util');
-const bleno = require('bleno');
+const bleno = require('@abandonware/bleno');
 
 const HeartRateMeasurementCharacteristic = require('./heart-rate-measurement-characteristic');
 
 
-function HeartRateService() {
-    this.hrm = new HeartRateMeasurementCharacteristic();
-    HeartRateService.super_.call(this, {
-        uuid: '180d',
-        characteristics: [this.hrm],
-    });
-    this.notify = function(event) {
+class HeartRateService extends bleno.PrimaryService {
+    constructor() {
+        const hrm = new HeartRateMeasurementCharacteristic();
+        super({
+            uuid: '180d',
+            characteristics: [hrm],
+        });
+        this.hrm = hrm;
+    }
+
+    notify(event) {
         this.hrm.notify(event);
-    };
+    }
 }
-util.inherits(HeartRateService, bleno.PrimaryService);
 
 module.exports = HeartRateService;

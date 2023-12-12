@@ -1,22 +1,23 @@
-const util = require('util');
-const bleno = require('bleno');
+const bleno = require('@abandonware/bleno');
 
 const BlenoPrimaryService = bleno.PrimaryService;
+const {RSCMeasurementCharacteristic, RSCFeatureCharacteristic} =
+    require('./running-speed-and-cadence-measurement-characteristic');
 
-const {RSCMeasurementCharacteristic, RSCFeatureCharacteristic} = require('./running-speed-and-cadence-measurement-characteristic');
 
+class RunningSpeedAndCadenceService extends BlenoPrimaryService {
+    constructor() {
+        const rscMeasurement = new RSCMeasurementCharacteristic();
+        super({
+            uuid: '1814',
+            characteristics: [rscMeasurement, new RSCFeatureCharacteristic()]
+        });
+        this.rscMeasurement = rscMeasurement;
+    }
 
-function RunningSpeedAndCadenceService() {
-    this.rscMeasurement = new RSCMeasurementCharacteristic();
-    RunningSpeedAndCadenceService.super_.call(this, {
-        uuid: '1814',
-        characteristics: [this.rscMeasurement, new RSCFeatureCharacteristic()]
-    });
-    this.notify = function(event) {
+    notify(event) {
         this.rscMeasurement.notify(event);
-    };
+    }
 }
-
-util.inherits(RunningSpeedAndCadenceService, BlenoPrimaryService);
 
 module.exports = RunningSpeedAndCadenceService;

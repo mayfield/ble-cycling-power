@@ -2,7 +2,7 @@ const {CyclingPowerService} = require('./cycling-power-service');
 const HeartRateService = require('./heart-rate-service');
 const RunningSpeedAndCadenceService = require('./running-speed-and-cadence-service');
 const DeviceInformationService = require('./device-information-service');
-const bleno = require('bleno');
+const bleno = require('@abandonware/bleno');
 
 
 const BluetoothPeripheral = function(name) {
