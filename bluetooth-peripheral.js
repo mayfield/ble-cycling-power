@@ -12,6 +12,7 @@ const BluetoothPeripheral = function(name) {
   this.rev_count = 0;
 
   this.start = function() {
+    console.info("Start BLE Advertising...");
     bleno.startAdvertising(name, [
         this.powerService.uuid,
         this.hrService.uuid,
@@ -19,6 +20,7 @@ const BluetoothPeripheral = function(name) {
     ]);
   };
   this.stop = function() {
+    console.warn("Stop BLE Advertising...");
     bleno.stopAdvertising();
   };
 

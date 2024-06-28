@@ -7,8 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@abandonware/bleno": "0.6.1",
-    "@abandonware/bluetooth-hci-socket": "0.5.3-10",
+    "@abandonware/bleno": "https://github.com/mayfield/bleno.git#linux-6.9-hack-slash-maybe-fix",
+    "bluetooth-hci-socket": "npm:@abandonware/bluetooth-hci-socket@0.5.3-12",
     "express": "4.18.2",
     "node-fetch": "2.6.11",
     "usb": "2.5.2",
