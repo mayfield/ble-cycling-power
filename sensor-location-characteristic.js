@@ -1,5 +1,5 @@
 const util = require('util');
-const bleno = require('@abandonware/bleno');
+const bleno = require('./bleno');
 
 class SensorLocationCharacteristic extends bleno.Characteristic {
     constructor() {

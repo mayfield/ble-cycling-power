@@ -1,4 +1,4 @@
-const bleno = require('@abandonware/bleno');
+const bleno = require('./bleno');
 
 const CyclingPowerMeasurementCharacteristic = require('./cycling-power-measurement-characteristic');
 const CylingPowerFeatureCharacteristic = require('./cycling-power-feature-characteristic');

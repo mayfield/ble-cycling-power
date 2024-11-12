@@ -1,4 +1,4 @@
-const bleno = require('@abandonware/bleno');
+const bleno = require('./bleno');
 
 
 class HeartRateMeasurementCharacteristic extends bleno.Characteristic {

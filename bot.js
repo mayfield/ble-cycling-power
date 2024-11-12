@@ -1,5 +1,5 @@
 const bcp = require('./');
-const bleno = require('@abandonware/bleno');
+const bleno = require('./bleno');
 const os = require('os');
 const fetch = require('node-fetch');
 const express = require('express');

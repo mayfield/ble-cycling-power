@@ -1,4 +1,4 @@
-const bleno = require('@abandonware/bleno');
+const bleno = require('./bleno');
 
 const BlenoPrimaryService = bleno.PrimaryService;
 const {RSCMeasurementCharacteristic, RSCFeatureCharacteristic} =

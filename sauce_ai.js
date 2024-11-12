@@ -1,8 +1,10 @@
 const fetch = require('node-fetch');
 const WebSocket = require('ws');
 const events = require('events');
+const HOST = 'jmlaptop.local';
+const PORT = 1080;
 
-const sauceURL = 'ws://127.0.0.1:1080/api/ws/events';
+const sauceURL = `ws://${HOST}:${PORT}/api/ws/events`;
 
 let _sauceWs;
 let _sauceWsId = 0;
@@ -105,7 +107,7 @@ async function main() {
     sauceGroups.on('data', async groups => {
         const curPower = await botAPI('power');
         const ourGroup = groups.find(x => x.athletes.some(x => x.self));
-        if (!ourGroup) {
+        if (!ourGroup || !ourGroup.speed) {
             return;
         }
         const ourAthlete = ourGroup.athletes.find(x => x.self);
