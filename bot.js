@@ -113,7 +113,7 @@ async function main() {
         res.json(wattsBasis);
     });
     webApp.put('/api/power', (req, res) => {
-        wattsBasis = req.body;
+        wattsBasis = Math.max(0, Math.min(1200, req.body));
         res.status(204);
         res.send();
     });

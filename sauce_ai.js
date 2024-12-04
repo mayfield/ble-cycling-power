@@ -1,7 +1,8 @@
 const fetch = require('node-fetch');
+const process = require('node:process');
 const WebSocket = require('ws');
 const events = require('events');
-const HOST = 'jmlaptop.local';
+const HOST = 'localhost';
 const PORT = 1080;
 
 const sauceURL = `ws://${HOST}:${PORT}/api/ws/events`;
@@ -10,6 +11,9 @@ let _sauceWs;
 let _sauceWsId = 0;
 const _sauceEmitters = new Map();
 const _sauceRequests = new Map();
+
+const stayInGroup = process.argv.includes('--stay-in-group');
+
 
 async function sauceSubscribe(event) {
     let ws = _sauceWs;
@@ -92,10 +96,7 @@ async function botAPI(name, options={}) {
 
 function adjPower(power, {min=0, max=1200}={}) {
     power = Math.max(min, Math.min(max, power));
-    if (power < 30) {
-        power = 0; // small numbers are suspect
-    }
-    botAPI('power', {json: power});
+    botAPI('power', {json: power < 60 ? 0 : power});
     return power;
 }
 
@@ -104,30 +105,56 @@ function adjPower(power, {min=0, max=1200}={}) {
 
 async function main() {
     const sauceGroups = await sauceSubscribe('groups');
+    let refPower = 0; // store internal intent during small power (< 60) coasting
     sauceGroups.on('data', async groups => {
         const curPower = await botAPI('power');
+        if (curPower) {
+            refPower = curPower;
+        }
         const ourGroup = groups.find(x => x.athletes.some(x => x.self));
         if (!ourGroup || !ourGroup.speed) {
             return;
         }
+        groups = groups.filter(x => Math.abs(x.gap) < 90);
         const ourAthlete = ourGroup.athletes.find(x => x.self);
         const ftp = ourAthlete.athlete?.ftp || 200;
         const wPrime = (ourAthlete.athlete?.wPrime || 20000);
         const wBal = Math.round(ourAthlete.stats.wBal || 10000);
         const wBalAdj = Math.round(wBal - Math.min(wPrime * 0.75, ourAthlete.state.time * 1.5));
         const wBalNorm = Math.round(Math.min(1, Math.max(0, (wBalAdj / wPrime))) * 25) / 25;
-        const max = Math.round(Math.max(1200, curPower) * wBalNorm + (ftp / 2));
-        console.log({wBal, wBalAdj, wBalNorm, wPrime, max, ftp});
-        const limits = {min: Math.min(0, curPower), max};
+        const max = Math.round(Math.min(1200, refPower) * wBalNorm + (ftp / 2));
+        //console.log({wBal, wBalAdj, wBalNorm, wPrime, max, ftp});
+        const limits = {min: Math.min(0, refPower), max};
         const adjust = (d, reason) => {
-            const pwr = adjPower(curPower + d, limits);
-            console.log(`[max: ${max}, wBal: ${wBal}, wBalAdj: ${wBalAdj-wBal}, wBalNorm: ${wBalNorm}]`);
+            const pwr = adjPower(refPower + d, limits);
+            console.log(`max: ${max}, wBal: ${wBal}, wBalAdj: ${wBalAdj-wBal}, wBalNorm: ${wBalNorm}`);
             console.log(`${d ? d > 0 ? '+' : '' : '+'}${d.toFixed(1)}w (${pwr.toFixed(0)}w): ${reason}`);
             return pwr;
         };
-        for (const x of groups) {
-            x.prio = Math.log2(1 + x.athletes.length);
-            x.prio *= x.gap < 0 ? 30 / -x.gap : x.gap > 0 ? 5 / x.gap : 2;
+        const setPower = (p, reason) => {
+            const pwr = adjPower(p, limits);
+            console.log(`max: ${max}, wBal: ${wBal}, wBalAdj: ${wBalAdj-wBal}, wBalNorm: ${wBalNorm}`);
+            console.log(`${p.toFixed(1)}w (${pwr.toFixed(0)}w): ${reason}`);
+            return pwr;
+        };
+        if (!stayInGroup) {
+            for (const x of groups) {
+                x.prio = Math.log2(1 + x.athletes.length) ** 2;
+                if (x.gap) {
+                    if (x.gap < 0) {
+                        x.prio *= (30 / -x.gap) ** 2;
+                    } else {
+                        x.prio *= (5 / x.gap) ** 2;
+                    }
+                } else {
+                    x.prio *= 2;
+                }
+            }
+        } else {
+            for (const x of groups) {
+                const gapFactor = 0.5;
+                x.prio = (x.athletes.length) * (gapFactor * (1 / Math.log1p(Math.abs(x.gap) + 1)));
+            }
         }
         const prioGroups = Array.from(groups).sort((a, b) => b.prio - a.prio);
         const targetGroup = prioGroups[0];
@@ -148,16 +175,16 @@ async function main() {
         console.log();
         if (ourGroup === targetGroup) {
             if (ourGroup.athletes.length < 2) {
-                adjust(Math.random() > 0.98 ? 1000 : Math.random() * 100, 'Solo time trial');
+                setPower(ftp / 2, 'Solo Z2 ride');
                 return;
             }
             const speedDelta = ourAthlete.state.speed - ourGroup.speed;
             const powerDelta = ourGroup.power / Math.max(1, ourAthlete.state.power);
             //console.log({powerDelta, speedDelta, speedDelta, os: ourAthlete.state.speed, gs: ourGroup.speed});
             if (speedDelta > 1.5) {
-                adjust(speedDelta * -4, 'Slowing down to avoid overshooting');
+                adjust(speedDelta * -10, 'Slowing down to avoid breakaway');
             } else if (speedDelta < -1.5) {
-                adjust(speedDelta * -6, 'Speeding up to avoid getting dropped');
+                adjust(speedDelta * -12, 'Speeding up to avoid getting dropped');
             } else {
                 const ourPos = ourGroup.athletes.findIndex(x => x.self);
                 const placement = ourPos / (ourGroup.athletes.length - 1);
@@ -183,8 +210,14 @@ async function main() {
             const dir = targetIndex < gIndex ? 1 : -1;
             const gap = Math.abs(targetGroup.gap - ourGroup.gap);
             const targetSpeed = targetGroup.speed + dir + (Math.min(10, gap * 0.25) * dir);
-            const speedDelta = targetSpeed - ourAthlete.state.speed;
-            const powerDelta = Math.max(-4, Math.min(10, Math.abs(speedDelta) ** 1.5 * Math.sign(speedDelta)));
+            let powerDelta;
+            if (Math.abs(targetGap < 14)) {
+                const speedDelta = targetSpeed - ourAthlete.state.speed;
+                powerDelta = Math.max(-20, Math.min(20, Math.abs(speedDelta) ** 1.5 * Math.sign(speedDelta)));
+            } else {
+                powerDelta = Math.max(-10, Math.min(10, Math.abs(speedDelta) ** 1.1 * Math.sign(speedDelta)));
+            }
+            const targetGap = ourGroup.gap - targetGroup.gap;
             //console.log({powerDelta, speedDelta, speedDelta, os: ourAthlete.state.speed, gs: ourGroup.speed});
             //console.log({targetSpeed, powerDelta, dir, gap}, 'ourspeed', ourAthlete.state.speed);
             let reason;
