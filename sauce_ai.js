@@ -211,13 +211,13 @@ async function main() {
             const gap = Math.abs(targetGroup.gap - ourGroup.gap);
             const targetSpeed = targetGroup.speed + dir + (Math.min(10, gap * 0.25) * dir);
             let powerDelta;
+            const targetGap = ourGroup.gap - targetGroup.gap;
             if (Math.abs(targetGap < 14)) {
                 const speedDelta = targetSpeed - ourAthlete.state.speed;
                 powerDelta = Math.max(-20, Math.min(20, Math.abs(speedDelta) ** 1.5 * Math.sign(speedDelta)));
             } else {
                 powerDelta = Math.max(-10, Math.min(10, Math.abs(speedDelta) ** 1.1 * Math.sign(speedDelta)));
             }
-            const targetGap = ourGroup.gap - targetGroup.gap;
             //console.log({powerDelta, speedDelta, speedDelta, os: ourAthlete.state.speed, gs: ourGroup.speed});
             //console.log({targetSpeed, powerDelta, dir, gap}, 'ourspeed', ourAthlete.state.speed);
             let reason;
