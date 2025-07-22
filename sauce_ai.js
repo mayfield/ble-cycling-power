@@ -13,6 +13,11 @@ const _sauceEmitters = new Map();
 const _sauceRequests = new Map();
 
 const stayInGroup = process.argv.includes('--stay-in-group');
+if (stayInGroup) process.argv.splice(process.argv.indexOf('--stay-in-group'), 1);
+if (process.argv.includes('--help') || process.argv.length > 2) {
+    console.log(`Usage: ${process.argv[1]} [--stay-in-group]`);
+    process.exit(1);
+}
 
 
 async function sauceSubscribe(event) {
@@ -142,9 +147,9 @@ async function main() {
                 x.prio = Math.log2(1 + x.athletes.length) ** 2;
                 if (x.gap) {
                     if (x.gap < 0) {
-                        x.prio *= (30 / -x.gap) ** 2;
+                        x.prio *= (30 / -x.gap);
                     } else {
-                        x.prio *= (5 / x.gap) ** 2;
+                        x.prio *= (5 / x.gap);
                     }
                 } else {
                     x.prio *= 2;
@@ -212,8 +217,8 @@ async function main() {
             const targetSpeed = targetGroup.speed + dir + (Math.min(10, gap * 0.25) * dir);
             let powerDelta;
             const targetGap = ourGroup.gap - targetGroup.gap;
+            const speedDelta = targetSpeed - ourAthlete.state.speed;
             if (Math.abs(targetGap < 14)) {
-                const speedDelta = targetSpeed - ourAthlete.state.speed;
                 powerDelta = Math.max(-20, Math.min(20, Math.abs(speedDelta) ** 1.5 * Math.sign(speedDelta)));
             } else {
                 powerDelta = Math.max(-10, Math.min(10, Math.abs(speedDelta) ** 1.1 * Math.sign(speedDelta)));
