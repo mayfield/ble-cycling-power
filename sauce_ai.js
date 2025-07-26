@@ -20,40 +20,23 @@ if (process.argv.includes('--help') || process.argv.length > 2) {
 }
 
 
-async function sauceSubscribe(event) {
-    let ws = _sauceWs;
-    if (!ws) {
+function sleep(ms) {
+    return new Promise(r => setTimeout(r, ms));
+}
+
+
+async function connectWebSocket(emitter, event) {
+    while (true) {
         ws = new WebSocket(sauceURL);
-        ws.on('close', code => {
-            console.warn("Sauce websocket closed:", code);
-            process.exit(1);
-            /*if (ws === _sauceWs) {
-                _sauceWs = null;
-            }*/
-        });
         ws.on('message', buf => {
             const msg = JSON.parse(buf);
-            if (msg.type === 'response') {
-                const {resolve, reject} = _sauceRequests.get(msg.uid);
-                _sauceRequests.delete(msg.uid);
-                if (msg.success) {
-                    resolve();
-                } else {
-                    console.error('sauce sub req error', msg);
-                    debugger;
-                    reject(new Error('sub error'));
-                }
-            } else if (msg.type === 'event') {
-                const emitter = _sauceEmitters.get(msg.uid);
+            if (msg.type === 'event') {
                 if (msg.success) {
                     emitter.emit('data', msg.data);
                 } else {
                     console.error("event error", msg);
                     emitter.emit('error', msg);
                 }
-            } else {
-                console.error('unexpected type', msg);
-                debugger;
             }
         });
         await new Promise((resolve, reject) => {
@@ -61,26 +44,45 @@ async function sauceSubscribe(event) {
             ws.on('open', resolve);
         });
         console.log("Sauce websocket connected:", sauceURL);
-        _sauceWs = ws;
-    }
-    _sauceWsId++;
-    const uid = `req-${_sauceWsId}`;
-    const subId = `sub-${_sauceWsId}`;
-    ws.send(JSON.stringify({
-        type: "request",
-        uid,
-        data: {
-            method: "subscribe",
-            arg: {
-                event,
-                subId,
+        _sauceWsId++;
+        const uid = `req-${_sauceWsId}`;
+        const subId = `sub-${_sauceWsId}`;
+        ws.send(JSON.stringify({
+            type: "request",
+            uid,
+            data: {
+                method: "subscribe",
+                arg: {
+                    event,
+                    subId,
+                }
             }
-        }
-    }));
-    const subReq = new Promise((resolve, reject) => _sauceRequests.set(uid, {resolve, reject}));
+        }));
+        return ws;
+    }
+}
+
+
+function sauceSubscribe(event) {
     const emitter = new events.EventEmitter();
-    _sauceEmitters.set(subId, emitter);
-    await subReq;
+    async function monitor() {
+        while (true) {
+            let ws;
+            try {
+                ws = await connectWebSocket(emitter, event);
+            } catch(e) {
+                console.error("connect error: retry in 2 seconds...");
+                await sleep(2000);
+                continue;
+            }
+            const code = await new Promise(resolve => {
+                ws.on('close', resolve);
+            });
+            console.warn("Sauce websocket closed:", code);
+            await sleep(2000);
+        }
+    }
+    monitor();
     console.log("Sauce ws subscribed to:", event);
     return emitter;
 }
@@ -106,10 +108,8 @@ function adjPower(power, {min=0, max=1200}={}) {
 }
 
 
-
-
 async function main() {
-    const sauceGroups = await sauceSubscribe('groups');
+    const sauceGroups = sauceSubscribe('groups');
     let refPower = 0; // store internal intent during small power (< 60) coasting
     sauceGroups.on('data', async groups => {
         const curPower = await botAPI('power');
