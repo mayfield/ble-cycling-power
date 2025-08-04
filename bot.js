@@ -8,6 +8,7 @@ let wattsBasis = parseInt(process.argv[2] || 100);
 let cadenceBasis = 60;
 let hrBasis = 105;
 let speedBasis = 5;
+const MAX_WATTS = 1300;
 const jitterPct = Number(process.argv[3] || 0.2);
 const signwave = false;
 const name = os.hostname();
@@ -29,7 +30,7 @@ async function sauceRPC(name, ...args) {
 }
 
 
-function adjPower(delta, {min=0, max=1200}={}) {
+function adjPower(delta, {min=0, max=MAX_WATTS}={}) {
     const desired = wattsBasis + delta;
     wattsBasis = Math.max(min, Math.min(max, desired));
     return wattsBasis;
@@ -113,7 +114,7 @@ async function main() {
         res.json(wattsBasis);
     });
     webApp.put('/api/power', (req, res) => {
-        wattsBasis = Math.max(0, Math.min(1200, req.body));
+        wattsBasis = Math.max(0, Math.min(MAX_WATTS, req.body));
         res.status(204);
         res.send();
     });
@@ -128,7 +129,7 @@ async function main() {
             process.exit(1);
             return;
         } else if (key === "\u001b[A") {
-            wattsBasis = Math.min(1200, wattsBasis + 10);
+            wattsBasis = Math.min(MAX_WATTS, wattsBasis + 10);
             console.log("Increase watts basis:", wattsBasis);
         } else if (key === "\u001b[B") {
             wattsBasis = Math.max(0, wattsBasis - 10);
