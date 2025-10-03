@@ -19,6 +19,12 @@ if (process.argv.includes('--help') || process.argv.length > 2) {
     process.exit(1);
 }
 
+if (stayInGroup) {
+    console.info("\nUsing Stay In Group Mode...\n");
+} else {
+    console.warn("\nUsing WIN Mode...\n");
+}
+
 
 function sleep(ms) {
     return new Promise(r => setTimeout(r, ms));
