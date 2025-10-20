@@ -4,7 +4,7 @@ const os = require('os');
 const fetch = require('node-fetch');
 const express = require('express');
 
-let wattsBasis = parseInt(process.argv[2] || 100);
+let wattsBasis = parseInt(process.argv[2] || 0);
 let cadenceBasis = 60;
 let hrBasis = 105;
 let speedBasis = 5;
